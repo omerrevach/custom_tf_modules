@@ -18,7 +18,7 @@ This module provisions an **Amazon EKS Cluster** with **Karpenter** for dynamic 
 
 ```hcl
 module "eks_karpenter" {
-  source  = "your-org/eks-karpenter/aws"
+  source  = "omerrevach/eks-karpenter/aws"
   version = "1.0.0"
 
   cluster_name = "example-cluster"
