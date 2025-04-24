@@ -21,7 +21,3 @@ output "node_group_role_arn" {
 output "eks_cluster_id" {
   value = module.eks.cluster_id
 }
-
-output "karpenter_irsa_arn" {
-  value = module.karpenter.irsa_arn
-}
