@@ -15,17 +15,6 @@ A flexible, production-ready Terraform module that provisions a complete AWS EKS
 
 ---
 
-## Module Structure
-
-```bash
-terraform-aws-eks-karpenter/
-├── main.tf
-├── vars.tf
-├── outputs.tf
-└── README.md
-```
----
-
 ## Usage:
 
 ```hcl
