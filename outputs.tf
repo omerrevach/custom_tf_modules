@@ -25,23 +25,3 @@ output "eks_cluster_id" {
 output "karpenter_irsa_arn" {
   value = module.karpenter.irsa_arn
 }
-
-output "irsa_arn" {
-  description = "IRSA Role ARN for Karpenter"
-  value       = aws_iam_role.karpenter.arn
-}
-
-output "role_name" {
-  description = "IAM role name used by Karpenter"
-  value       = aws_iam_role.karpenter.name
-}
-
-output "queue_name" {
-  description = "SQS queue name used by Karpenter"
-  value       = aws_sqs_queue.karpenter.name
-}
-
-output "queue_arn" {
-  description = "SQS queue ARN used by Karpenter"
-  value       = aws_sqs_queue.karpenter.arn
-}
