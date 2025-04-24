@@ -46,7 +46,7 @@ module "eks_karpenter_cluster" {
   cluster_endpoint_private_access          = true
   cluster_endpoint_public_access           = true
 
-  enable_karpenter = var.enable_karpenter
+  enable_karpenter = true
 
   karpenter_instance_categories = ["t"]
   karpenter_instance_families   = ["t3"]
