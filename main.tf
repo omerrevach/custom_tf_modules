@@ -67,7 +67,7 @@ module "vpc" {
 
   private_subnet_tags = {
     "kubernetes.io/role/internal-elb" = "1"
-    "karpenter.sh/discovery"         = var.cluster_name
+    "karpenter.sh/discovery"          = var.cluster_name
   }
 
   public_subnet_tags = {
@@ -81,21 +81,22 @@ module "eks" {
   source  = "terraform-aws-modules/eks/aws"
   version = "~> 20.31"
 
-  cluster_name                         = var.cluster_name
-  cluster_version                      = var.cluster_version
-  vpc_id                               = module.vpc.vpc_id
-  subnet_ids                           = module.vpc.private_subnets
-  control_plane_subnet_ids             = module.vpc.public_subnets
-  enable_irsa                          = var.enable_irsa
+  cluster_name                             = var.cluster_name
+  cluster_version                          = var.cluster_version
+  vpc_id                                   = module.vpc.vpc_id
+  subnet_ids                               = module.vpc.private_subnets
+  control_plane_subnet_ids                 = module.vpc.public_subnets
+  enable_irsa                              = var.enable_irsa
   enable_cluster_creator_admin_permissions = var.enable_cluster_creator_admin_permissions
-  cluster_endpoint_private_access      = var.cluster_endpoint_private_access
-  cluster_endpoint_public_access       = var.cluster_endpoint_public_access
+  cluster_endpoint_private_access          = var.cluster_endpoint_private_access
+  cluster_endpoint_public_access           = var.cluster_endpoint_public_access
 
   cluster_addons = {
-    coredns                = {}
-    kube-proxy             = {}
-    vpc-cni                = {}
-    eks-pod-identity-agent = {}
+    coredns                = { most_recent = true }
+    kube-proxy             = { most_recent = true }
+    vpc-cni                = { most_recent = true }
+    eks-pod-identity-agent = { most_recent = true }
+    aws-ebs-csi-driver     = { most_recent = true }
   }
 
   eks_managed_node_groups = {
@@ -127,16 +128,17 @@ data "aws_ecrpublic_authorization_token" "token" {
 }
 
 module "karpenter" {
+  count  = var.enable_karpenter ? 1 : 0
   source = "terraform-aws-modules/eks/aws//modules/karpenter"
 
-  cluster_name                     = var.cluster_name
+  cluster_name                    = var.cluster_name
   enable_v1_permissions           = true
   enable_pod_identity             = true
   create_pod_identity_association = true
 
   node_iam_role_additional_policies = {
-    AmazonSSMManagedInstanceCore   = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
-    AmazonEC2SpotFleetTaggingRole  = "arn:aws:iam::aws:policy/service-role/AmazonEC2SpotFleetTaggingRole"
+    AmazonSSMManagedInstanceCore  = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+    AmazonEC2SpotFleetTaggingRole = "arn:aws:iam::aws:policy/service-role/AmazonEC2SpotFleetTaggingRole"
   }
 
   depends_on = [module.eks]

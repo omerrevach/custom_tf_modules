@@ -108,34 +108,40 @@ variable "cluster_endpoint_public_access" {
 variable "tags" {
   description = "A map of tags to apply to resources"
   type        = map(string)
-  default     = {
+  default = {
     Terraform   = "true"
     Environment = "dev"
   }
 }
 
 variable "karpenter_instance_categories" {
-  type        = list(string)
-  default     = ["t"]
+  type    = list(string)
+  default = ["t"]
 }
 
 variable "karpenter_instance_families" {
-  type        = list(string)
-  default     = ["t3"]
+  type    = list(string)
+  default = ["t3"]
 }
 
 variable "karpenter_instance_cpus" {
-  type        = list(string)
-  default     = ["4"]
+  type    = list(string)
+  default = ["4"]
 }
 
 variable "karpenter_capacity_types" {
-  type        = list(string)
-  default     = ["spot", "on-demand"]
+  type    = list(string)
+  default = ["spot", "on-demand"]
 }
 
 variable "karpenter_cpu_limit" {
   description = "CPU limit for Karpenter NodePool"
   type        = number
   default     = 300
+}
+
+variable "enable_karpenter" {
+  description = "Whether to enable Karpenter"
+  type        = bool
+  default     = true
 }
