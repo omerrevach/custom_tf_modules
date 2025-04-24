@@ -98,3 +98,11 @@ module "eks_karpenter_cluster" {
 - Terraform >= 1.3
 - AWS CLI configured
 - Helm + Kubectl Terraform providers
+
+---
+
+## Contributing
+
+You're welcome to contribute!  
+Feel free to fork the repo, make changes, and open a pull request.
+
