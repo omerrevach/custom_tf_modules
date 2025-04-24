@@ -20,7 +20,7 @@ A flexible, production-ready Terraform module that provisions a complete AWS EKS
 ```hcl
 module "eks_karpenter_cluster" {
   source = "omerrevach/eks-karpenter/aws"
-  version = "1.0.1"
+  version = "1.0.4"
 
   cluster_name = "prod-cluster"
   region       = "eu-north-1"
