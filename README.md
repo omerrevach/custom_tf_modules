@@ -23,7 +23,7 @@ terraform-aws-eks-karpenter/
 ├── vars.tf
 ├── outputs.tf
 └── README.md
-
+```
 ---
 
 ## Usage:
