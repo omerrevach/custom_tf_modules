@@ -1,3 +1,21 @@
+terraform {
+  required_version = ">= 1.3"
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
+    }
+    helm = {
+      source  = "hashicorp/helm"
+      version = ">= 2.7.0"
+    }
+    kubectl = {
+      source  = "gavinbunney/kubectl"
+      version = "~> 1.14"
+    }
+  }
+}
+
 provider "aws" {
   region = var.region
 }
@@ -10,6 +28,7 @@ provider "aws" {
 provider "kubectl" {
   host                   = module.eks.cluster_endpoint
   cluster_ca_certificate = base64decode(module.eks.cluster_certificate_authority_data)
+
   exec {
     api_version = "client.authentication.k8s.io/v1beta1"
     command     = "aws"
@@ -21,6 +40,7 @@ provider "helm" {
   kubernetes {
     host                   = module.eks.cluster_endpoint
     cluster_ca_certificate = base64decode(module.eks.cluster_certificate_authority_data)
+
     exec {
       api_version = "client.authentication.k8s.io/v1beta1"
       command     = "aws"
@@ -37,10 +57,10 @@ module "vpc" {
 
   name = var.cluster_name
   cidr = var.vpc_cidr
-  azs  = slice(data.aws_availability_zones.available.names, 0, 3)
 
-  private_subnets = [for i in range(3) : cidrsubnet(var.vpc_cidr, 4, i)]
-  public_subnets  = [for i in range(3) : cidrsubnet(var.vpc_cidr, 8, i + 48)]
+  azs             = slice(data.aws_availability_zones.available.names, 0, 3)
+  private_subnets = var.private_subnet_cidrs
+  public_subnets  = var.public_subnet_cidrs
 
   enable_nat_gateway = var.enable_nat_gateway
   single_nat_gateway = var.single_nat_gateway
@@ -61,38 +81,36 @@ module "eks" {
   source  = "terraform-aws-modules/eks/aws"
   version = "~> 20.31"
 
-  cluster_name    = var.cluster_name
-  cluster_version = var.cluster_version
-  vpc_id          = module.vpc.vpc_id
-  subnet_ids      = module.vpc.private_subnets
-  control_plane_subnet_ids = module.vpc.public_subnets
-
-  enable_irsa = var.enable_irsa
+  cluster_name                         = var.cluster_name
+  cluster_version                      = var.cluster_version
+  vpc_id                               = module.vpc.vpc_id
+  subnet_ids                           = module.vpc.private_subnets
+  control_plane_subnet_ids             = module.vpc.public_subnets
+  enable_irsa                          = var.enable_irsa
   enable_cluster_creator_admin_permissions = var.enable_cluster_creator_admin_permissions
-  cluster_endpoint_private_access = var.cluster_endpoint_private_access
-  cluster_endpoint_public_access  = var.cluster_endpoint_public_access
+  cluster_endpoint_private_access      = var.cluster_endpoint_private_access
+  cluster_endpoint_public_access       = var.cluster_endpoint_public_access
 
   cluster_addons = {
     coredns                = {}
     kube-proxy             = {}
     vpc-cni                = {}
     eks-pod-identity-agent = {}
-    aws-ebs-csi-driver     = {}
   }
 
   eks_managed_node_groups = {
-    default = {
+    general = {
       instance_type = var.instance_type
-      min_size      = var.min_size
-      max_size      = var.max_size
-      desired_size  = var.desired_size
+      min_size      = var.node_min_size
+      max_size      = var.node_max_size
+      desired_size  = var.node_desired_size
 
       tags = {
         "karpenter.sh/discovery" = var.cluster_name
       }
 
       labels = {
-        role = "default"
+        role = "general"
       }
     }
   }
@@ -117,8 +135,8 @@ module "karpenter" {
   create_pod_identity_association = true
 
   node_iam_role_additional_policies = {
-    AmazonSSMManagedInstanceCore  = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
-    AmazonEC2SpotFleetTaggingRole = "arn:aws:iam::aws:policy/service-role/AmazonEC2SpotFleetTaggingRole"
+    AmazonSSMManagedInstanceCore   = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+    AmazonEC2SpotFleetTaggingRole  = "arn:aws:iam::aws:policy/service-role/AmazonEC2SpotFleetTaggingRole"
   }
 
   depends_on = [module.eks]
@@ -129,7 +147,7 @@ resource "helm_release" "karpenter" {
   namespace  = "kube-system"
   chart      = "karpenter"
   repository = "oci://public.ecr.aws/karpenter"
-  version    = "1.1.1"
+  version    = var.karpenter_version
 
   repository_username = data.aws_ecrpublic_authorization_token.token.user_name
   repository_password = data.aws_ecrpublic_authorization_token.token.password
@@ -137,7 +155,7 @@ resource "helm_release" "karpenter" {
   wait             = false
   create_namespace = true
 
-  depends_on = [module.karpenter]
+  depends_on = [module.eks]
 
   set {
     name  = "serviceAccount.name"
@@ -167,6 +185,7 @@ resource "helm_release" "karpenter" {
 
 resource "kubectl_manifest" "karpenter_node_class" {
   depends_on = [helm_release.karpenter]
+
   yaml_body = <<-YAML
     apiVersion: karpenter.k8s.aws/v1
     kind: EC2NodeClass
@@ -188,6 +207,7 @@ resource "kubectl_manifest" "karpenter_node_class" {
 
 resource "kubectl_manifest" "karpenter_node_pool" {
   depends_on = [kubectl_manifest.karpenter_node_class]
+
   yaml_body = <<-YAML
     apiVersion: karpenter.sh/v1
     kind: NodePool
@@ -203,18 +223,18 @@ resource "kubectl_manifest" "karpenter_node_pool" {
           requirements:
             - key: karpenter.k8s.aws/instance-category
               operator: In
-              values: ["t"]
+              values: ${jsonencode(var.karpenter_instance_categories)}
             - key: karpenter.k8s.aws/instance-family
               operator: In
-              values: ["t3"]
+              values: ${jsonencode(var.karpenter_instance_families)}
             - key: karpenter.k8s.aws/instance-cpu
               operator: In
-              values: ["4"]
+              values: ${jsonencode(var.karpenter_instance_cpus)}
             - key: karpenter.sh/capacity-type
               operator: In
-              values: ["spot", "on-demand"]
+              values: ${jsonencode(var.karpenter_capacity_types)}
       limits:
-        cpu: 300
+        cpu: ${var.karpenter_cpu_limit}
       disruption:
         consolidationPolicy: WhenEmpty
         consolidateAfter: 30s

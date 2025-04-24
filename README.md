@@ -1,120 +1,105 @@
 # terraform-aws-eks-karpenter
 
-This module provisions an **Amazon EKS Cluster** with **Karpenter** for dynamic autoscaling and node provisioning. It creates the VPC, EKS control plane, managed node groups, Karpenter Helm chart, and custom `EC2NodeClass` and `NodePool` for spot/on-demand scaling.
+A flexible, production-ready Terraform module that provisions a complete AWS EKS cluster integrated with [Karpenter](https://karpenter.sh) for dynamic, cost-optimized autoscaling. Supports full customization of VPC, NAT gateways, node groups, and Karpenter configuration.
 
 ---
 
 ## Features:
 
-- EKS cluster with IRSA, addons, and flexible public/private access
-- Karpenter Helm deployment using OCI from `us-east-1` (cross-region)
-- Dynamic creation of `EC2NodeClass` and `NodePool`
-- IAM Roles and OIDC support for secure autoscaling
-- Fully configurable via variables (region, VPC CIDR, NAT gateway, etc.)
+- Fully dynamic VPC configuration
+- Managed EKS cluster with IRSA enabled
+- Autoscaling with Karpenter (via Helm and kubectl manifests)
+- Public/private endpoint control
+- Node group support (general or specialized roles)
+- Tags, labels, Helm options, and more — all configurable
+
+---
+
+## Module Structure
+
+```bash
+terraform-aws-eks-karpenter/
+├── main.tf
+├── vars.tf
+├── outputs.tf
+└── README.md
 
 ---
 
 ## Usage:
 
 ```hcl
-module "eks_karpenter" {
-  source  = "omerrevach/eks-karpenter/aws"
-  version = "1.0.0"
+module "eks_karpenter_cluster" {
+  source = "github.com/yourusername/terraform-eks-karpenter-wrapper"
 
-  cluster_name = "example-cluster"
+  cluster_name = "prod-cluster"
   region       = "eu-north-1"
 
-  vpc_cidr            = "10.0.0.0/16"
-  enable_nat_gateway  = true
-  single_nat_gateway  = true
+  cluster_version     = "1.31"
+  karpenter_version   = "1.1.1"
+  karpenter_service_account_name = "karpenter"
 
-  eks_cluster_version                  = "1.31"
-  cluster_endpoint_private_access      = true
-  cluster_endpoint_public_access       = true
-  enable_irsa                          = true
-  enable_cluster_creator_permissions   = true
+  instance_type       = "t3.medium"
+  node_min_size       = 2
+  node_max_size       = 5
+  node_desired_size   = 3
 
-  instance_type = "t3.medium"
+  vpc_cidr = "10.0.0.0/16"
+  private_subnet_cidrs = ["10.0.0.0/20", "10.0.16.0/20", "10.0.32.0/20"]
+  public_subnet_cidrs  = ["10.0.48.0/24", "10.0.49.0/24", "10.0.50.0/24"]
+
+  enable_nat_gateway = true
+  single_nat_gateway = true
+
+  enable_irsa                              = true
+  enable_cluster_creator_admin_permissions = true
+  cluster_endpoint_private_access          = true
+  cluster_endpoint_public_access           = true
+
+  karpenter_instance_categories = ["t"]
+  karpenter_instance_families   = ["t3"]
+  karpenter_instance_cpus       = ["2", "4"]
+  karpenter_capacity_types      = ["spot", "on-demand"]
+  karpenter_cpu_limit           = 300
 
   tags = {
-    Environment = "dev"
     Terraform   = "true"
+    Environment = "prod"
+    Project     = "eks-karpenter"
   }
 }
 ```
 
-## Inputs:
+## Inputs
 
-### Required
+| Name | Description | Type | Default | Required |
+|------|-------------|------|---------|:--------:|
+| cluster_name | Name of the EKS cluster | string | n/a | yes |
+| cluster_version | EKS Kubernetes version | string | `"1.31"` | no |
+| region | AWS region to deploy into | string | `"eu-north-1"` | no |
+| vpc_cidr | CIDR block for the VPC | string | `"10.0.0.0/16"` | no |
+| public_subnet_cidrs | List of public subnet CIDRs | list | n/a | yes |
+| private_subnet_cidrs | List of private subnet CIDRs | list | n/a | yes |
+| enable_nat_gateway | Whether to enable NAT gateway | bool | `true` | no |
+| single_nat_gateway | Whether to use a single NAT gateway | bool | `true` | no |
+| enable_irsa | Enable IAM roles for service accounts (IRSA) | bool | `true` | no |
+| enable_cluster_creator_admin | Grant creator full admin permissions | bool | `true` | no |
+| cluster_endpoint_private_access | Enable private access to API server | bool | `true` | no |
+| cluster_endpoint_public_access | Enable public access to API server | bool | `true` | no |
+| instance_type | Default instance type for general node group | string | `"t3.medium"` | no |
+| karpenter_service_account_name | Name of the Karpenter service account | string | `"karpenter"` | no |
+| tags | Tags to apply to all resources | map | `{}` | no |
 
-- **`cluster_name`** *(string)*  
-  Name of the EKS cluster.
+## Outputs
 
-- **`region`** *(string)*  
-  AWS region where the EKS cluster is deployed.
-
----
-
-### Optional (with defaults)
-
-- **`vpc_cidr`** *(string)*  
-  CIDR block for the VPC.  
-  Default: `"10.0.0.0/16"`
-
-- **`enable_nat_gateway`** *(bool)*  
-  Enable creation of NAT Gateway(s).  
-  Default: `true`
-
-- **`single_nat_gateway`** *(bool)*  
-  Use a single NAT Gateway instead of one per AZ.  
-  Default: `true`
-
-- **`eks_cluster_version`** *(string)*  
-  Kubernetes version for EKS.  
-  Default: `"1.31"`
-
-- **`cluster_endpoint_private_access`** *(bool)*  
-  Enable private API access to the EKS cluster.  
-  Default: `true`
-
-- **`cluster_endpoint_public_access`** *(bool)*  
-  Enable public API access to the EKS cluster.  
-  Default: `true`
-
-- **`enable_irsa`** *(bool)*  
-  Enable IAM Roles for Service Accounts (IRSA).  
-  Default: `true`
-
-- **`enable_cluster_creator_permissions`** *(bool)*  
-  Add admin permissions for the user creating the cluster.  
-  Default: `true`
-
-- **`instance_type`** *(string)*  
-  EC2 instance type for the default managed node group.  
-  Default: `"t3.medium"`
-
-- **`tags`** *(map)*  
-  Map of tags to apply to all resources.  
-  Default: `{}`
-
----
-
-## 📤 Outputs
-
-- **`cluster_name`**  
-  Name of the created EKS cluster.
-
-- **`cluster_endpoint`**  
-  API server endpoint URL for the EKS cluster.
-
-- **`vpc_id`**  
-  ID of the created VPC.
-
-- **`private_subnets`**  
-  List of private subnet IDs created.
-
-- **`public_subnets`**  
-  List of public subnet IDs created.
+| Name | Description |
+|------|-------------|
+| eks_cluster_id | ID of the EKS cluster |
+| eks_cluster_name | Name of the EKS cluster |
+| karpenter_role_arn | IAM role ARN used by Karpenter |
+| vpc_id | ID of the VPC created |
+| public_subnet_ids | List of public subnet IDs |
+| private_subnet_ids | List of private subnet IDs |
 
 ---
 
