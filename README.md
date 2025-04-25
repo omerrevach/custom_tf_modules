@@ -1,5 +1,7 @@
 # terraform-aws-eks-karpenter
 
+👉 Official Terraform Registry: https://registry.terraform.io/modules/omerrevach/eks-karpenter/aws
+
 A flexible, production-ready Terraform module that provisions a complete AWS EKS cluster integrated with [Karpenter](https://karpenter.sh) for dynamic, cost-optimized autoscaling. Supports full customization of VPC, NAT gateways, node groups, and Karpenter configuration.
 
 ---
